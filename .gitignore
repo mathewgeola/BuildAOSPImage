@@ -4,3 +4,6 @@
 .DS_Store
 *.log
 *.pyc
+BuildAOSPImage/build/
+BuildAOSPImage/BuildAOSPImage.spec
+BuildAOSPImage/dist/

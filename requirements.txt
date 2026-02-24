@@ -1,2 +1,4 @@
 pyside6
 pyinstaller
+auto-py-to-exe
+pillow

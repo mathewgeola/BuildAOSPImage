@@ -7,10 +7,11 @@ import sys
 import zipfile
 
 from PySide6.QtCore import QObject, QThread, Signal, QUrl
-from PySide6.QtGui import QTextCursor
+from PySide6.QtGui import QTextCursor, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QTextBrowser
 
 from ui_mainwindow import Ui_MainWindow
+import resources_rc
 
 
 class Logger(QObject):
@@ -44,7 +45,7 @@ class Logger(QObject):
         html_text = f'<span style="color:{color};">{safe_text}</span>'
 
         self.text_browser.append(html_text)
-        self.text_browser.moveCursor(QTextCursor.End)
+        self.text_browser.moveCursor(QTextCursor.End)  # noqa
 
     @staticmethod
     def _handle_anchorClicked(url: QUrl) -> None:  # noqa
@@ -238,9 +239,13 @@ class MainWindow(QMainWindow):
         self._ui = Ui_MainWindow()
         self._ui.setupUi(self)
 
-        self.dir_path: str = os.path.dirname(os.path.abspath(__file__))
+        self.dir_path: str = os.path.dirname(
+            sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__)
+        )
 
-        self.logger = Logger(self._ui.logTextBrowser, log_file_path="app.log")
+        # log_file_path = "app.log"
+        log_file_path = None
+        self.logger = Logger(self._ui.logTextBrowser, log_file_path)
 
         self._threads = []
 
@@ -276,6 +281,9 @@ class MainWindow(QMainWindow):
             self._ui.aospBuildImgFilePathListLineEdit.setText(result)
 
     def on_buildPushButton_clicked(self):  # noqa
+        if not self._ui.factoryImageFilePathLineEdit.text() or not self._ui.aospBuildImgFilePathListLineEdit.text():
+            return
+
         self._ui.factoryImageFilePathPushButton.setEnabled(False)
         self._ui.aospBuildImgFilePathListPushButton.setEnabled(False)
         self._ui.buildPushButton.setEnabled(False)
@@ -298,6 +306,7 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     def main():
         app = QApplication(sys.argv)
+        app.setWindowIcon(QIcon(":/icon.ico"))
         window = MainWindow()
         window.show()
         sys.exit(app.exec())
