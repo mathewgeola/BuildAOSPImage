@@ -16,7 +16,7 @@ from ui_mainwindow import Ui_MainWindow
 class Logger(QObject):
     log_signal = Signal(str, str, bool)
 
-    def __init__(self, text_browser: QTextBrowser, log_file_path: str = None):
+    def __init__(self, text_browser: QTextBrowser, log_file_path: str | None = None):
         super().__init__()
         self.text_browser = text_browser
         self.log_file_path = log_file_path
@@ -36,7 +36,7 @@ class Logger(QObject):
         else:
             self._file = None
 
-    def _handle_log_signal(self, text, color, is_html):
+    def _handle_log_signal(self, text: str, color: str, is_html: bool) -> None:
         if not is_html:
             safe_text = html.escape(text)
         else:
@@ -47,7 +47,7 @@ class Logger(QObject):
         self.text_browser.moveCursor(QTextCursor.End)
 
     @staticmethod
-    def _handle_anchorClicked(url: QUrl):  # noqa
+    def _handle_anchorClicked(url: QUrl) -> None:  # noqa
         if not url or not url.isValid():
             return
 
@@ -85,7 +85,7 @@ class Logger(QObject):
             else:
                 subprocess.Popen(["xdg-open", path])
 
-    def _log(self, level, msg, color, is_html=False):
+    def _log(self, level: str, msg: str, color: str, is_html: bool = False) -> None:
         datetime_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         full_msg = f"{datetime_str} {level} [*] {msg}"
 
@@ -123,10 +123,24 @@ class Worker(QObject):
         super().__init__()
         self.main_window = main_window
 
+    def _delete_path(self, path: str) -> None:
+        if os.path.exists(path):
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+                self.main_window.logger.info(f"rmtree {path!r}")
+                return
+            if os.path.isfile(path):
+                os.remove(path)
+                self.main_window.logger.info(f"remove {path!r}")
+                return
+
+    def _make_dir_path(self, dir_path: str) -> None:
+        if not os.path.exists(dir_path):
+            os.makedirs(dir_path, exist_ok=True)
+            self.main_window.logger.info(f"makedirs {dir_path!r}")
+
     def _zip(self, unzip_dir_path: str, zip_file_path: str) -> None:
-        if os.path.exists(zip_file_path):
-            os.remove(zip_file_path)
-            self.main_window.logger.info(f"remove {zip_file_path!r}")
+        self._delete_path(zip_file_path)
 
         self.main_window.logger.debug(f"start zip {unzip_dir_path!r}")
         with zipfile.ZipFile(zip_file_path, "w", compression=zipfile.ZIP_STORED) as zf:
@@ -138,12 +152,9 @@ class Worker(QObject):
         self.main_window.logger.debug(f"finish zip {zip_file_path!r}")
 
     def _unzip(self, zip_file_path: str, unzip_dir_path: str) -> None:
-        if os.path.exists(unzip_dir_path):
-            shutil.rmtree(unzip_dir_path)
-            self.main_window.logger.info(f"rmtree {unzip_dir_path!r}")
+        self._delete_path(unzip_dir_path)
 
-        os.makedirs(unzip_dir_path, exist_ok=True)
-        self.main_window.logger.info(f"makedirs {unzip_dir_path!r}")
+        self._make_dir_path(unzip_dir_path)
 
         self.main_window.logger.debug(f"start unzip {zip_file_path!r}")
         with zipfile.ZipFile(zip_file_path, "r", compression=zipfile.ZIP_STORED) as zf:
@@ -155,21 +166,29 @@ class Worker(QObject):
             self.main_window.logger.debug("start build aosp image")
 
             factory_image_file_path = self.main_window.ui.factoryImageFilePathLineEdit.text()
+            if not factory_image_file_path or not os.path.exists(factory_image_file_path):
+                self.main_window.logger.error(f"illegal {factory_image_file_path!r}")
+                return
+
             aosp_build_img_file_path_list = self.main_window.ui.aospBuildImgFilePathListLineEdit.text().split(";")
+            if not aosp_build_img_file_path_list or not all(map(os.path.exists, aosp_build_img_file_path_list)):
+                self.main_window.logger.error(f"illegal {aosp_build_img_file_path_list!r}")
+                return
 
             prefix, suffix = os.path.splitext(os.path.basename(factory_image_file_path))
+
             aosp_image_file_path = os.path.join(
                 self.main_window.dir_path,
                 prefix + "_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S") + suffix
             )
+
             factory_image_unzip_dir_path = os.path.join(
                 self.main_window.dir_path,
                 prefix
             )
             self._unzip(factory_image_file_path, factory_image_unzip_dir_path)
-
             if len(lst := os.listdir(factory_image_unzip_dir_path)) != 1:
-                self.main_window.logger.error(f"illegal {factory_image_unzip_dir_path!r}")
+                self.main_window.logger.error(f"illegal {lst!r}")
                 return
 
             inner_dir_path = os.path.join(factory_image_unzip_dir_path, lst[0])
@@ -178,10 +197,10 @@ class Worker(QObject):
                        map(lambda x: os.path.join(inner_dir_path, x), os.listdir(inner_dir_path)))
             )
             if len(lst) != 1:
-                self.main_window.logger.error(f"illegal {inner_dir_path!r}")
+                self.main_window.logger.error(f"illegal {lst!r}")
                 return
-            inner_zip_file_path = lst[0]
 
+            inner_zip_file_path = lst[0]
             inner_zip_unzip_dir_path = os.path.join(
                 os.path.dirname(inner_zip_file_path), os.path.splitext(inner_zip_file_path)[0]
             )
@@ -189,17 +208,13 @@ class Worker(QObject):
 
             for aosp_build_img_file_path in aosp_build_img_file_path_list:
                 shutil.copy2(aosp_build_img_file_path, inner_zip_unzip_dir_path)
-                self.main_window.logger.info(f"copy {aosp_build_img_file_path!r} ==> {inner_zip_unzip_dir_path!r}")
+                self.main_window.logger.info(f"copy {aosp_build_img_file_path!r} to {inner_zip_unzip_dir_path!r}")
 
             self._zip(inner_zip_unzip_dir_path, inner_zip_file_path)
-
-            shutil.rmtree(inner_zip_unzip_dir_path)
-            self.main_window.logger.info(f"rmtree {inner_zip_unzip_dir_path!r}")
+            self._delete_path(inner_zip_unzip_dir_path)
 
             self._zip(factory_image_unzip_dir_path, aosp_image_file_path)
-
-            shutil.rmtree(factory_image_unzip_dir_path)
-            self.main_window.logger.info(f"remove {factory_image_unzip_dir_path!r}")
+            self._delete_path(factory_image_unzip_dir_path)
 
             path = aosp_image_file_path
             url = QUrl.fromLocalFile(path).toString()
