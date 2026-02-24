@@ -8,10 +8,9 @@ import zipfile
 
 from PySide6.QtCore import QObject, QThread, Signal, QUrl
 from PySide6.QtGui import QTextCursor, QIcon
-from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QTextBrowser
+from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QTextBrowser, QMessageBox
 
 from ui_mainwindow import Ui_MainWindow
-import resources_rc
 
 
 class Logger(QObject):
@@ -233,6 +232,9 @@ class Worker(QObject):
             self.main_window.ui.buildPushButton.setEnabled(True)
 
 
+APP_VERSION = "v1.0.0"
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -249,9 +251,18 @@ class MainWindow(QMainWindow):
 
         self._threads = []
 
+        self._ui.actionAbout.triggered.connect(self.on_actionAbout_triggered)
+
         self._ui.factoryImageFilePathPushButton.clicked.connect(self.on_factoryImageFilePathPushButton_clicked)
         self._ui.aospBuildImgFilePathListPushButton.clicked.connect(self.on_aospBuildImgFilePathListPushButton_clicked)
         self._ui.buildPushButton.clicked.connect(self.on_buildPushButton_clicked)
+
+    def on_actionAbout_triggered(self):
+        QMessageBox.information(
+            self,
+            "About BuildAOSPImage",
+            f"BuildAOSPImage Version {APP_VERSION}\n© 2026 mathewgeola"
+        )
 
     @property
     def ui(self):
