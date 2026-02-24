@@ -3,3 +3,4 @@
 *.python-version
 .DS_Store
 *.log
+*.pyc

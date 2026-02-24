@@ -2,4 +2,4 @@
 name = "BuildAOSPImage"
 
 [tool.pyside6-project]
-files = ["main.py", "mainwindow.ui", "logger.py"]
+files = ["main.py", "mainwindow.ui"]
